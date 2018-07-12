@@ -1,15 +1,15 @@
 // Translation of Courrieu 2018 Fast Computation of Moore-Penrose Inverse Matrices arXiv:0804.4809 [cs]
 // Written for square matrices currently
-matrix geninv(matrix G, int n){
+matrix geninv(matrix G, int n, real epsilon){
     vector[n] dA;
     matrix[n,n] A;
     matrix[n,n] L;
     matrix[n,n] LL;
     matrix[n,n] Y;
-    real tol;
     int r;
+    real tol;
 
-    // classic starting move
+    // classic Nimzo-Indian start to everything
     A = (G') * G;
 
     // Full rank Cholesky factorization of A 
@@ -20,27 +20,30 @@ matrix geninv(matrix G, int n){
             tol = dA[i];
         }
     }
-    tol *= 1E-9;
+    tol *= epsilon;
     
-    // I don't know if this is necessary
+    // I don't know if this is necessary but didn't want L to not start with all zeroes
+    // DEBUG check what happens if we comment it out
     for( i in 1:n ){
         for( j in 1:n ){
             L[i,j] = 0;
         }
     }
 
+    // go column by column to get the Cholesky factorization
     r = 0;
     for( k in 1:n ){
         r += 1;
+        // the first column is just a normalized version of the first column of A; nothing fancy required
         if(r == 1){
             L[k:n,r] = A[k:n,k];
         }
-        // stan complains about having L on the LHS and RHS
+        // stan complains about having L on the LHS and RHS; I believe we could decouple these somehow
         else{
             L[k:n,r] = A[k:n,k] - block(L,k,1,n-k+1,r-1) * sub_row(L,k,1,r-1)'; //L[k:n,1:(r-1)] * L[k,1:(r-1)]';
         }
 
-        // Note: for r=1, the substracted vector is zero
+        // if the diagonal is larger than our tolerance we will keep it and must normalize
         if(L[k,r] > tol){
             L[k,r] = sqrt(L[k,r]);
             if (k < n){
@@ -48,12 +51,18 @@ matrix geninv(matrix G, int n){
                     L[j,r] /= L[k,r];
                 }
             }
-        }else{
+        }
+        // otherwise the matrix is not full rank and hence we will not use these columns in the transformation later
+        else{
              r = r - 1;
         }
+
+        // DEBUG as a potential speed up, we could probably break the loop once we've reached the rank of the matrix
     }
 
-    // LL is the reduced form and we add zeros to the final few columns just in case
+    // LL is the reduced-rank form of L
+    // we again add zeros to the final few columns just in case LL is not initialized as all zeroes
+    // DEBUG as a potential speed up, we can check that this is not necessary
     LL[:,1:r] = L[:,1:r];
     for( i in 1:n ){
         for( j in (r+1):n ){
