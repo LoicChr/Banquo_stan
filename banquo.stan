@@ -1,4 +1,80 @@
 functions{
+            matrix geninv(matrix G, int n, real epsilon){
+              vector[n] dA;
+              matrix[n,n] A;
+              matrix[n,n] L;
+              matrix[n,n] LL;
+              matrix[n,n] Y;
+              int r;
+              real tol;
+          
+              // classic Nimzo-Indian start to everything
+              A = (G') * G;
+          
+              // Full rank Cholesky factorization of A 
+              dA = diagonal(A);
+              tol = max(dA);
+              for( i in 1:n ){
+                  if(dA[i] > 0 && dA[i] < tol){
+                      tol = dA[i];
+                  }
+              }
+              tol *= epsilon;
+              
+              // I don't know if this is necessary but didn't want L to not start with all zeroes
+              // DEBUG check what happens if we comment it out
+              for( i in 1:n ){
+                  for( j in 1:n ){
+                      L[i,j] = 0;
+                  }
+              }
+          
+              // go column by column to get the Cholesky factorization
+              r = 0;
+              for( k in 1:n ){
+                  r += 1;
+                  // the first column is just a normalized version of the first column of A; nothing fancy required
+                  if(r == 1){
+                      L[k:n,r] = A[k:n,k];
+                  }
+                  // stan complains about having L on the LHS and RHS; I believe we could decouple these somehow
+                  else{
+                      L[k:n,r] = A[k:n,k] - block(L,k,1,n-k+1,r-1) * sub_row(L,k,1,r-1)'; //L[k:n,1:(r-1)] * L[k,1:(r-1)]';
+                  }
+          
+                  // if the diagonal is larger than our tolerance we will keep it and must normalize
+                  if(L[k,r] > tol){
+                      L[k,r] = sqrt(L[k,r]);
+                      if (k < n){
+                          for( j in (k+1):n ){
+                              L[j,r] /= L[k,r];
+                          }
+                      }
+                  }
+                  // otherwise the matrix is not full rank and hence we will not use these columns in the transformation later
+                  else{
+                       r = r - 1;
+                  }
+          
+                  // DEBUG as a potential speed up, we could probably break the loop once we've reached the rank of the matrix
+              }
+          
+              // LL is the reduced-rank form of L
+              // we again add zeros to the final few columns just in case LL is not initialized as all zeroes
+              // DEBUG as a potential speed up, we can check that this is not necessary
+              LL[:,1:r] = L[:,1:r];
+              for( i in 1:n ){
+                  for( j in (r+1):n ){
+                      LL[i,j] = 0;
+                  }
+              }
+          
+              // Computation of the generalized inverse of G
+              // We regretably need to do the two separate inverses since I don't know how to dynamically set a matrix size
+              Y = block(LL,1,1,n,r) * inverse(block(LL,1,1,n,r)' * block(LL,1,1,n,r)) * inverse(block(LL,1,1,n,r)' * block(LL,1,1,n,r)) * block(LL,1,1,n,r)' * G';
+          
+              return Y;
+          }
     // if we want to define any functions we can do that here; this example might not work though
     row_vector traitspace_to_banquo(row_vector K, matrix sampled_alpha, int S){
         row_vector[S] N;
@@ -7,7 +83,7 @@ functions{
         matrix[S,S] sampled_alpha2;
         row_vector[S] K2;
         real minVal;
-        alpha_inv = inverse(sampled_alpha); 
+        alpha_inv = geninv(sampled_alpha, S, 10e-8); 
         N = (alpha_inv * K')';
         species = to_row_vector(rep_vector(1,S));
         minVal = min(N .* species);
@@ -19,7 +95,7 @@ functions{
           }
          }
         sampled_alpha2 = quad_form_diag(sampled_alpha, species);
-        alpha_inv = inverse(sampled_alpha2);
+        alpha_inv = geninv(sampled_alpha2, S, 10e-8);
         K2 = K .* species;
         N = (alpha_inv * K2')';
         minVal = min(N .* species);
@@ -29,15 +105,11 @@ functions{
     }
     real hellinger(vector obs, vector pred){
       real hell;
-   //   int S;
-   //   S = size(obs);
-      hell = sum(exp(2*log(sqrt(obs) - sqrt(pred))));
-   //   for (i in 1:S){
-   //     hell += exp(2*log(sqrt(obs[i])- sqrt(pred[i])));
-   //   }
-      hell = -1*sqrt(hell)/sqrt(2);
+      hell = dot_product(sqrt(obs)-sqrt(pred), sqrt(obs)-sqrt(pred));
+      hell = 1-1*sqrt(hell)/sqrt(2);
       return hell;
     }
+    
 }
 data{
     // input data passed to stan
@@ -83,12 +155,13 @@ parameters{
             if( i == j ){
                 sampled_alpha[i,i] = aii;// pass as these are sampled by alphaii variable above
              }else{
-                  sampled_alpha[i,j] = alphaij_intercept*alphaij_width*sqrt(2*pi());
-             //  sampled_alpha[i,j] = alphaij_intercept*sqrt(2*pi());
-                  sampled_alpha[i,j] *= exp(normal_lpdf(traits[i,1] - traits[j,1] | alphaij_center, alphaij_width));
+                  // sampled_alpha[i,j] = alphaij_intercept*alphaij_width*sqrt(2*pi());
+                   sampled_alpha[i,j] = (traits[i,1] - traits[j,1] - alphaij_center)/alphaij_width ;
+                  sampled_alpha[i,j] = alphaij_intercept*exp(-sampled_alpha[i,j]*sampled_alpha[i,j]);
+               //   sampled_alpha[i,j] *= exp(normal_lpdf(traits[i,1] - traits[j,1] | alphaij_center, alphaij_width));
                      //        sampled_alpha[j,i] = alphaij_intercept*sqrt(2*pi()); 
-                  sampled_alpha[j,i] = alphaij_intercept*alphaij_width*sqrt(2*pi());
-                 sampled_alpha[j,i] *= exp(normal_lpdf(traits[j,1] - traits[i,1] | alphaij_center, alphaij_width));
+                   sampled_alpha[j,i] = (traits[j,1] - traits[i,1] - alphaij_center)/alphaij_width ;
+                  sampled_alpha[j,i] = alphaij_intercept*exp(-sampled_alpha[j,i]*sampled_alpha[j,i]);
           //  sampled_alpha[j,i] =0;
           //  sampled_alpha[i,j] =0;
             }
