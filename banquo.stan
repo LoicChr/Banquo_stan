@@ -4,7 +4,7 @@ functions{
       matrix[n,n] A;
       matrix[n,n] L;
       matrix[n,n] LL;
-      matrix[n,n] LLinv;
+      matrix[n,n] M;
       matrix[n,n] Y;
       int r;
       real tol;
@@ -62,11 +62,11 @@ functions{
       LL[:,1:r] = L[:,1:r];
 
       // use the top left of the LLinv matrix to hold the inverse of LL' LL
-      LLinv = rep_matrix(0,n,n);
-      LLinv[1:r,1:r] = inverse(block(LL,1,1,n,r)' * block(LL,1,1,n,r));
+      M = rep_matrix(0,n,n);
+      M[1:r,1:r] = inverse(block(LL,1,1,n,r)' * block(LL,1,1,n,r));
 
       // final computation of the generalized inverse of G
-      Y = block(LL,1,1,n,r) * block(LLinv,1,1,r,r) * block(LLinv,1,1,r,r) * block(LL,1,1,n,r)' * G';
+      Y = block(LL,1,1,n,r) * block(M,1,1,r,r) * block(M,1,1,r,r) * block(LL,1,1,n,r)' * G';
   
       return Y;
     }
