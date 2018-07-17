@@ -49,8 +49,8 @@ banquo.fit <- stan(
   file = "banquo.stan",
   data = stan.data,
   iter = 1000,
-  chains = 1,
+  chains = 1
   # verbose = TRUE,
-  boost_lib = "/usr/include/boost",
-  eigen_lib = "/usr/include/eigen3"
+  # boost_lib = "/usr/include/boost",
+  # eigen_lib = "/usr/include/eigen3"
 )
