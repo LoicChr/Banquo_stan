@@ -145,8 +145,6 @@ parameters{
 }
 transformed parameters{
     matrix[S,S] sampled_alpha;
-    matrix[N,S] banquo;
-    matrix[Nsites, S] banquo_agg;
 
     // construct the alpha matrix given the sampled parameters
     for( i in 1:S ){
@@ -168,6 +166,25 @@ transformed parameters{
       }
     }
 
+}
+model{
+    matrix[N,S] banquo;
+    matrix[Nsites, S] banquo_agg;
+
+    // priors on core inferred parameters
+    // DEBUG: we should consider regularizing the priors to get better behavior
+    logmean_alphaii ~ normal(0, 1);
+    sigma_alphaii ~ cauchy(0, 2);
+    alphaij_intercept ~ cauchy(0, 2);
+    alphaij_center ~ normal(0, 10);
+    alphaij_width ~ cauchy(0, 2);
+
+    // intraspecific interaction coefficients as lognormal "random effects"
+    // aii ~ lognormal(logmean_alphaii, sigma_alphaii);
+    for( i in 1:S ){
+        aii[i] ~ lognormal(logmean_alphaii, sigma_alphaii);
+    }
+
     // calculate banquo predictions across all observations
     banquo = (geninv(sampled_alpha, S, 10e-8) * traitspace')';
 
@@ -183,25 +200,10 @@ transformed parameters{
     }
     
     // normalize site-specific banquo results so that they represent relative abundances
-    for (i in 1:Nsites){
+    for(i in 1:Nsites){
       banquo_agg[i] = banquo_agg[i]/sum(banquo_agg[i]);
     }
-}
-model{
-    // priors on core inferred parameters
-    // DEBUG: we should consider regularizing the priors to get better behavior
-    logmean_alphaii ~ normal(0, 1);
-    sigma_alphaii ~ cauchy(0, 2);
-    alphaij_intercept ~ cauchy(0, 2);
-    alphaij_center ~ normal(0, 10);
-    alphaij_width ~ cauchy(0, 2);
-
-    // intraspecific interaction coefficients as lognormal "random effects"
-    // aii ~ lognormal(logmean_alphaii, sigma_alphaii);
-    for( i in 1:S ){
-        aii[i] ~ lognormal(logmean_alphaii, sigma_alphaii);
-    }
-
+    
     // sample predicted values using banquo_agg computed in transformed_parameters block
     for( i in 1:Nsites ){
       // observed[i] ~ normal(banquo_agg[i], sigma_obs);
