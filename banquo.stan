@@ -66,7 +66,7 @@ functions{
       LLinv[1:r,1:r] = inverse(block(LL,1,1,n,r)' * block(LL,1,1,n,r));
 
       // final computation of the generalized inverse of G
-      Y = block(LL,1,1,n,r) * block(LLinv,1,1,r,r) * block(LLinv,1,1,r,r)' * block(LL,1,1,n,r)' * G';
+      Y = block(LL,1,1,n,r) * block(LLinv,1,1,r,r) * block(LLinv,1,1,r,r) * block(LL,1,1,n,r)' * G';
   
       return Y;
     }
