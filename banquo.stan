@@ -138,10 +138,10 @@ parameters{
     real<lower=0> sigma_alphaii;
     real<lower=0> aii[S];
     
-    // // control the interspecific values
-    // real<lower=0> alphaij_intercept;
-    // real alphaij_center;
-    // real<lower=0> alphaij_width;
+    // control the interspecific values
+    real<lower=0> alphaij_intercept;
+    real alphaij_center;
+    real<lower=0> alphaij_width;
 }
 transformed parameters{
     matrix[S,S] sampled_alpha;
@@ -155,14 +155,15 @@ transformed parameters{
           // intraspecific alphas
           sampled_alpha[i,i] = aii[i];
         }else{
-          // // interspecific alpha based on distance from i to j
-          // sampled_alpha[i,j] = alphaij_intercept * exp(-pow(traits[i,1] - traits[j,1] - alphaij_center, 2)/alphaij_width);
+          // // for testing purposes only          
+          // sampled_alpha[i,j] = 0;
+          // sampled_alpha[j,i] = 0;
 
-          // // interspecific alpha based on distance from j to i
-          // sampled_alpha[j,i] = alphaij_intercept * exp(-pow(traits[j,1] - traits[i,1] - alphaij_center, 2)/alphaij_width);
+          // interspecific alpha based on distance from i to j
+          sampled_alpha[i,j] = alphaij_intercept * exp(-pow(traits[i,1] - traits[j,1] - alphaij_center, 2)/alphaij_width);
 
-          sampled_alpha[i,j] = 0;
-          sampled_alpha[j,i] = 0;
+          // interspecific alpha based on distance from j to i
+          sampled_alpha[j,i] = alphaij_intercept * exp(-pow(traits[j,1] - traits[i,1] - alphaij_center, 2)/alphaij_width);
         }
       }
     }
@@ -188,12 +189,12 @@ transformed parameters{
 }
 model{
     // priors on core inferred parameters
-    // DEBUG: we can think about 'clever' starting values to help convergence
-    logmean_alphaii ~ normal(0, 10);
+    // DEBUG: we should consider regularizing the priors to get better behavior
+    logmean_alphaii ~ normal(0, 1);
     sigma_alphaii ~ cauchy(0, 2);
-    // alphaij_intercept ~ cauchy(0, 2);
-    // alphaij_center ~ normal(0, 10);
-    // alphaij_width ~ cauchy(0, 2);
+    alphaij_intercept ~ cauchy(0, 2);
+    alphaij_center ~ normal(0, 10);
+    alphaij_width ~ cauchy(0, 2);
 
     // intraspecific interaction coefficients as lognormal "random effects"
     // aii ~ lognormal(logmean_alphaii, sigma_alphaii);
