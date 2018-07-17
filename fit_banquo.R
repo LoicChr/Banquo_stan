@@ -16,7 +16,7 @@ library(rethinking)
 N <- 50
 S <- 15
 T <- 1
-Nsites <- 100
+Nsites <- 50
 sites <- as.numeric(gl(Nsites,N))
 
 # fake observed relative abundances
@@ -41,6 +41,8 @@ stan.data <- list(
   observed = observed,
   traitspace = traitspace
 )
+
+# DEBUG: we should think about 'clever' starting values to help convergence of chains
 
 # fit banquo model in stan
 banquo.fit <- stan(
