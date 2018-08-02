@@ -6,11 +6,11 @@ rstan_options(auto_write = TRUE)
 library(rethinking)
 
 
-load("data/stan_data.Rdata")
+load("stan_data.Rdata")
 
 # fit banquo model in stan
 banquo.fit <- stan(
-  file = "lib/stan3/banquo_tmp.stan",
+  file = "banquo_tmp.stan",
   data = stan.data,
   iter = 20,
   chains = 1,
@@ -23,5 +23,5 @@ banquo.fit <- stan(
   #   boost_lib = "/usr/include/boost",
   #  eigen_lib = "/usr/include/eigen3"
 )
-id <- floor(100000*runif(1))
-save(list = ls(), file = paste0("results/results_", id, ".Rdata"))
+#id <- floor(100000*runif(1))
+#save(list = ls(), file = paste0("results/results_", id, ".Rdata"))
